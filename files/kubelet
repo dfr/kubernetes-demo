@@ -1,0 +1,67 @@
+#!/bin/sh
+
+# PROVIDE: kubelet
+# REQUIRE: DAEMON crio
+
+# Add the following lines to /etc/rc.conf to enable `kubelet':
+#
+# kubelet_enable	Set to YES to enable kubelet
+#			Default: NO
+# kubelet_flags		Extra flags to pass to kubelet
+#			Default: none
+# kubelet_log		File to log kubelet output
+#			Default: /var/log/kubelet.log
+# kubelet_bootstrap_kubeconfig	Config file used to bootstrap kubelet.conf
+#			Default: /usr/local/etc/kubernetes/bootstrap-kubelet.conf
+# kubelet_kubeconfig	Config file to connect to the cluster
+#			Default: /usr/local/etc/kubernetes/kubelet.conf
+# kubelet_config	Config file for kubelet runtime options
+#			Default: /var/db/kubelet/config.yaml
+# kubelet_pause_image	Image to use for infra containers
+#			Default: quay.io/dougrabson/pause:latest
+# kubelet_root		Directory for storing kubelet state
+#			Default: /var/db/kubelet
+#
+
+. /etc/rc.subr
+
+if [ -f /var/db/kubelet/kubeadm-flags.env ]; then
+	. /var/db/kubelet/kubeadm-flags.env
+fi
+
+name="kubelet"
+rcvar=kubelet_enable
+
+load_rc_config "$name"
+: ${kubelet_enable:="NO"}
+: ${kubelet_flags:=""}
+: ${kubelet_log:="/var/log/kubelet.log"}
+: ${kubelet_bootstrap_kubeconfig:="/usr/local/etc/kubernetes/bootstrap-kubelet.conf"}
+: ${kubelet_kubeconfig:="/usr/local/etc/kubernetes/kubelet.conf"}
+: ${kubelet_config:="/var/db/kubelet/config.yaml"}
+: ${kubelet_options:="\
+      ${kubelet_flags} \
+      --bootstrap-kubeconfig=${kubelet_bootstrap_kubeconfig} \
+      --kubeconfig=${kubelet_kubeconfig} \
+      --config=${kubelet_config} \
+      ${KUBELET_KUBEADM_ARGS} \
+      --feature-gates=PodAndContainerStatsFromCRI=true"}
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+
+command="/usr/local/bin/kubelet"
+pidfile="/var/run/$name.pid"
+procname="/usr/local/bin/kubelet"
+start_cmd="kubelet_start"
+
+kubelet_start()
+{
+    startmsg "Starting ${name}."
+    while [ ! -S /var/run/crio/crio.sock ]; do
+	startmsg "Waiting for CRI-O"
+	sleep 1
+    done
+    /usr/sbin/daemon -o ${kubelet_log} -f -p ${pidfile} -H ${command} ${kubelet_options}
+}
+
+run_rc_command "$1"
