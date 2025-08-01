@@ -19,14 +19,21 @@ sudo kldload if_bridge
 sudo kldload pf
 sudo sysrc kld_list="nullfs fdescfs if_bridge pf"
 
+ensure_sysctl() {
+	local var=$1; shift
+	grep -q ${var} /etc/sysctl.conf || (
+		echo ${var} | sudo tee -a /etc/sysctl.conf > /dev/null
+	)
+}
+
+# Sysctl settings to allow routing and filtering for cluster network traffic
+ensure_sysctl 'net.pf.filter_local=1'
+ensure_sysctl 'net.inet.ip.forwarding=1'
+ensure_sysctl 'net.link.bridge.pfil_member=1'
+service sysctl start
+
 # Set up a simple PF config which is needed for container networking
 if [ ! -f /etc/pf.conf ]; then
-	grep -q 'net.pf.filter_local=1' /etc/sysctl.conf || (
-		echo 'net.pf.filter_local=1' | sudo tee -a /etc/sysctl.conf > /dev/null
-		echo 'net.inet.ip.forwarding=1' | sudo tee -a /etc/sysctl.conf > /dev/null
-		echo 'net.link.bridge.pfil_member=1' | sudo tee -a /etc/sysctl.conf > /dev/null
-		service sysctl start
-	)
 	cat >> pf.conf-tmp <<EOF
 v4egress_if = "${netif}"
 v6egress_if = "${netif}"
@@ -62,11 +69,13 @@ fi
 	git pull
 	gmake
 	sudo install build/bin/freebsd/amd64/crictl /usr/local/bin
-	cat >/usr/local/etc/crictl.yaml <<EOF
+	# TODO sudo
+	cat >crictl.yaml-tmp <<EOF
 runtime-endpoint: "unix:///var/run/crio/crio.sock"
 timeout: 0
 debug: false
 EOF
+	sudo mv crictl.yaml-tmp /usr/local/etc/crictl.yaml
 )
 
 # Build and install CRI-O
@@ -130,7 +139,6 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 serverTLSBootstrap: true
 EOF
 
-
 sudo service crio start
 sleep 1
 sudo kubeadm init --config ./kubeadm-config.yaml || exit 1
@@ -140,7 +148,7 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 # Approve node TLS signing requests
 sleep 1
-kubectl get csr  --no-headers | cut -w -f1 | xargs kubectl certificate approve
+kubectl get csr --no-headers | cut -w -f1 | xargs kubectl certificate approve
 
 # Remove taints from our single node so that we can schedule non control plane
 # workloads
