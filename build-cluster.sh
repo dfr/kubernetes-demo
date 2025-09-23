@@ -30,7 +30,7 @@ ensure_sysctl() {
 ensure_sysctl 'net.pf.filter_local=1'
 ensure_sysctl 'net.inet.ip.forwarding=1'
 ensure_sysctl 'net.link.bridge.pfil_member=1'
-service sysctl start
+sudo service sysctl start
 
 # Set up a simple PF config which is needed for container networking
 if [ ! -f /etc/pf.conf ]; then
