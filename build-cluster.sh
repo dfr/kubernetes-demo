@@ -140,7 +140,12 @@ serverTLSBootstrap: true
 EOF
 
 sudo service crio start
-sleep 1
+while [ ! -S /var/run/crio/crio.sock ]; do
+	echo "Waiting for crio to start"
+	sleep 1
+done
+echo "crio is running"
+
 sudo kubeadm init --config ./kubeadm-config.yaml || exit 1
 mkdir -p $HOME/.kube
 sudo cp /usr/local/etc/kubernetes/admin.conf $HOME/.kube/config
