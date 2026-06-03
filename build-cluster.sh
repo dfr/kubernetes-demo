@@ -81,7 +81,7 @@ EOF
 # Build and install CRI-O
 echo "Building CRI-O"
 if [ ! -d cri-o ]; then
-	git clone -b freebsd-wip https://github.com/dfr/cri-o.git
+	git clone -b freebsd-wip-1.33.0 https://github.com/dfr/cri-o.git
 fi
 (
 	if [ -f /usr/local/etc/rc.d/crio ]; then
@@ -108,7 +108,7 @@ fi
 	cd kubernetes
 	git remote add dfr https://github.com/dfr/kubernetes.git
 	git fetch dfr
-	git checkout freebsd-kubelet
+	git checkout freebsd-kubelet-v1.31.0-alpha
 	gmake WHAT=cmd/kubelet
 	sudo install _output/local/go/bin/kubelet /usr/local/bin
 	sudo sysrc kubelet_enable=YES
@@ -118,7 +118,7 @@ fi
 echo "Building kubeadm, a tool for creating and managing clusters"
 (
 	cd kubernetes
-	git checkout freebsd-kubeadm
+	git checkout freebsd-kubeadm-v1.31.0-alpha
 	gmake WHAT=cmd/kubeadm
 	sudo install _output/local/go/bin/kubeadm /usr/local/bin
 )
