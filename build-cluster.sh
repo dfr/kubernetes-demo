@@ -24,6 +24,14 @@ sudo kldload if_bridge
 sudo kldload pf
 sudo sysrc kld_list="nullfs fdescfs if_bridge pf"
 
+ocijail_version=$(ocijail --version | cut -w -f3)
+ocijail_major=$(echo ${ocijail_version} | cut -d'.' -f1)
+ocijail_minor=$(echo ${ocijail_version} | cut -d'.' -f2)
+if [ ${ocijail_major} -le 1 -a ${ocijail_minor} -lt 6 ]; then
+	echo "ocijail ${ocijail_version} is too old; install version 0.6.0 or later"
+	exit 1
+fi
+
 ensure_sysctl() {
 	local var=$1; shift
 	grep -q ${var} /etc/sysctl.conf || (
@@ -86,7 +94,7 @@ EOF
 # Build and install CRI-O
 echo "Building CRI-O"
 if [ ! -d cri-o ]; then
-	git clone -b freebsd-wip-1.33.0 https://github.com/dfr/cri-o.git
+	git clone -b freebsd-wip-1.37.0 https://github.com/dfr/cri-o.git
 fi
 (
 	if [ -f /usr/local/etc/rc.d/crio ]; then
@@ -113,7 +121,7 @@ fi
 	cd kubernetes
 	git remote add dfr https://github.com/dfr/kubernetes.git
 	git fetch dfr
-	git checkout freebsd-kubelet-v1.31.0-alpha
+	git checkout freebsd-kubelet-v1.36.1
 	gmake WHAT=cmd/kubelet
 	sudo install _output/local/go/bin/kubelet /usr/local/bin
 	sudo sysrc kubelet_enable=YES
@@ -123,7 +131,7 @@ fi
 echo "Building kubeadm, a tool for creating and managing clusters"
 (
 	cd kubernetes
-	git checkout freebsd-kubeadm-v1.31.0-alpha
+	git checkout freebsd-kubeadm-v1.36.1
 	gmake WHAT=cmd/kubeadm
 	sudo install _output/local/go/bin/kubeadm /usr/local/bin
 )
@@ -131,10 +139,14 @@ echo "Building kubeadm, a tool for creating and managing clusters"
 # Build a single node cluster using kubeadm
 echo "Building a single node cluster"
 cat >kubeadm-config.yaml <<EOF
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
-apiVersion: kubeadm.k8s.io/v1beta3
+etcd:
+  local:
+    imageRepository: ghcr.io/dfr
+    imageTag: 3.6.5-0
 imageRepository: ghcr.io/dfr
-kubernetesVersion: v1.31.0-alpha
+kubernetesVersion: v1.36.1
 networking:
   serviceSubnet: 10.96.0.0/12
   podSubnet: 10.244.0.0/16
