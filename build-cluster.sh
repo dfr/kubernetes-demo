@@ -8,6 +8,11 @@ if [ $# != 1 ]; then
 fi
 netif=$1; shift
 
+if [ "$(sysctl -n kern.racct.enable)" -eq 0 ]; then
+	echo 'RACCT is disabled; to enable, add kern.racct.enable="1" to /boot/loader.conf and reboot'
+	exit 1
+fi
+
 # Install Podman packages and supporting utilities which are also needed for
 # Kubernetes
 echo "Installing and initialising podman-suite"
